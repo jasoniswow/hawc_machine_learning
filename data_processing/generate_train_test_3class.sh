@@ -1,0 +1,11 @@
+python 2_data_generation_Data_Hadron_3class.py 0
+python 2_data_generation_Data_Hadron_3class.py 1
+python 2_data_generation_Data_Hadron_3class.py 2
+python 2_data_generation_Data_Hadron_3class.py 3
+python 2_data_generation_Data_Hadron_3class.py 4
+python 2_data_generation_Data_Hadron_3class.py 5
+
+
+
+
+

@@ -1,0 +1,2 @@
+model_checkpoint_path: "/home/zhixiang/machine_learning/hawc_ML/tensorflow_3class/Bin_2_features_0_weight_11_HL_1_NF_1_LR_0.001_epochs_5000/model.ckpt"
+all_model_checkpoint_paths: "/home/zhixiang/machine_learning/hawc_ML/tensorflow_3class/Bin_2_features_0_weight_11_HL_1_NF_1_LR_0.001_epochs_5000/model.ckpt"

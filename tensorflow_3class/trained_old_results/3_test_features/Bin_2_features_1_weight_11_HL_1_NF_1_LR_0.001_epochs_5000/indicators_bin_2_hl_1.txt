@@ -1,0 +1,8 @@
+Loss:             1.7017 
+Accuracy:         0.8258 
+Precision(Sig_w): 0.0009 
+Precision(Bkg_w): 0.0001, 1.0000 
+Recall(Sig_w):    0.7466 
+Recall(Bkg_w):    0.6242, 0.8708 
+pseudoPrecision:  0.1649 
+Rejection:        0.9799 

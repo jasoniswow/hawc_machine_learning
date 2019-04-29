@@ -5,7 +5,9 @@ import time
 import numpy as np
 import pandas as pd
 import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
+plt.switch_backend('agg')
 import tensorflow as tf
 from xml.etree import ElementTree as ET
 # execution start time
@@ -26,8 +28,11 @@ parser.add_argument('--fileDir', type=str, default='/home/zhixiang/machine_learn
 parser.add_argument('--bin', type=int,
                     help='analysis bin')
 
-parser.add_argument('--featureGroup', type=int, default=9, 
-                    help='9=All_Features(default), 0-6=minus_one_group, -1=4_Features')
+parser.add_argument('--coreposition', type=float, default=150,
+                    help='extra core position cut (default=150)')
+
+parser.add_argument('--featureGroup', type=int, default=9,
+                    help='-1=essential, 0=28_basic, 9=all40')
 
 parser.add_argument('--weightedEvents', type=int, default=1, 
                     help='0=no_eventWeights, 1=using_weighed(default)')
@@ -82,6 +87,8 @@ print ( "Define feature groups =================================================
 # 40 features in total
 features_all = ['nTankHit', 'SFCFChi2', 'planeChi2', 'coreFitUnc', 'zenithAngle', 'azimuthAngle', 'coreFiduScale', 'nHitSP10', 'nHitSP20', 'CxPE20', 'CxPE30', 'CxPE40', 'CxPE50', 'CxPE40SPTime', 'PINC', 'GamCoreAge', 'numPoints', 'scandelCore', 'numSum', 'scanedFrac', 'fixedFrac', 'avePE', 'nHit', 'mPFnHits', 'mPFnPlanes', 'mPFp1nAssign', 'fAnnulusCharge0', 'fAnnulusCharge1', 'fAnnulusCharge2', 'fAnnulusCharge3', 'fAnnulusCharge4', 'fAnnulusCharge5', 'fAnnulusCharge6', 'fAnnulusCharge7', 'fAnnulusCharge8', 'disMax', 'compactness', 'nHit10ratio', 'nHit20ratio', 'nHitRatio']
 
+feature_basic = ['SFCFChi2', 'planeChi2', 'coreFitUnc', 'coreFiduScale', 'CxPE20', 'CxPE30', 'CxPE40', 'CxPE50', 'CxPE40SPTime', 'PINC', 'GamCoreAge', 'numPoints', 'scandelCore', 'numSum', 'scanedFrac', 'fixedFrac', 'avePE', 'fAnnulusCharge0', 'fAnnulusCharge1', 'fAnnulusCharge2', 'fAnnulusCharge3', 'fAnnulusCharge4', 'fAnnulusCharge5', 'fAnnulusCharge6', 'fAnnulusCharge7', 'fAnnulusCharge8', 'disMax', 'compactness']
+
 # essential features were used previously
 f_essential = ['PINC', 'compactness', 'nHit20ratio', 'CxPE40']
 # 7 features groups (compactness & pincness not included) to be tested
@@ -94,47 +101,36 @@ f_group4 = ['GamCoreAge', 'numPoints', 'scandelCore', 'numSum', 'scanedFrac', 'f
 f_group5 = ['fAnnulusCharge0', 'fAnnulusCharge1', 'fAnnulusCharge2', 'fAnnulusCharge3', 'fAnnulusCharge4', 'fAnnulusCharge5', 'fAnnulusCharge6', 'fAnnulusCharge7', 'fAnnulusCharge8']
 f_group6 = ['zenithAngle', 'azimuthAngle', 'mPFnHits', 'disMax',  'nHitRatio', 'nTankHit'] # others
 
-if (args.featureGroup==9):
-    features = features_all
-elif (args.featureGroup==-1):
+if (args.featureGroup==-1): # 4 essential features
     features = f_essential
-elif (args.featureGroup==0):
-    features = list( set(features_all) - set(f_group0) ) # the order of features will be shuffled !
-elif (args.featureGroup==1):
-    features = list( set(features_all) - set(f_group1) )
-elif (args.featureGroup==2):
-    features = list( set(features_all) - set(f_group2) )
-elif (args.featureGroup==3):
-    features = list( set(features_all) - set(f_group3) )
-elif (args.featureGroup==4):
-    features = list( set(features_all) - set(f_group4) )
-elif (args.featureGroup==5):
-    features = list( set(features_all) - set(f_group5) )
-elif (args.featureGroup==6):
-    features = list( set(features_all) - set(f_group6) )
+elif (args.featureGroup==0): # 28 basic features
+    features = feature_basic
+elif (args.featureGroup==9):
+    features = features_all
 else:
     print ("Please define feature group !")
     sys.exit()
 
 
 
+# delAngle + delCore separation
 print ( "Class weights =================================================================================" )
 # The weighted sum of each class for each bin (fHitH is a bin with all high energy stuff)
 #           GoodGamma       BadGamma        GoodHadron        BadHadron
-# fHit0a    174.27094       48.297292       34819907          8511550
-# fHit0b    84.773993       17.604392       15939123          2770632
-# fHit0c    41.192327       7.8943760       7178234           989307
-# fHit1     55.650121       10.229783       10158870          1064614
-# fHit2     14.470345       2.5089225       2989884           231220
-# fHitH     11.993302       2.2295808       3039715           221999
+# fHit0a    154.01147       68.556762       33053664          10277792
+# fHit0b    76.700188       25.678196       15163345          3546410
+# fHit0c    37.205287       11.881415       6777390           1390151
+# fHit1     50.052587       15.827318       9471407           1752077
+# fHit2     13.028451       3.9508159       2803206           417899
+# fHitH     10.873147       3.3497361       2717979           543735
 # weighted sum of all classes for each bin 
 weightedSum_all = [
-174.27094+       48.297292+       34819907+          8511550,
-84.773993+       17.604392+       15939123+          2770632,
-41.192327+       7.8943760+       7178234 +          989307 ,
-55.650121+       10.229783+       10158870+          1064614,
-14.470345+       2.5089225+       2989884 +          231220 ,
-11.993302+       2.2295808+       3039715 +          221999 ]
+154.01147+       68.556762+       33053664+          10277792,
+76.700188+       25.678196+       15163345+          3546410 ,
+37.205287+       11.881415+       6777390 +          1390151 ,
+50.052587+       15.827318+       9471407 +          1752077 ,
+13.028451+       3.9508159+       2803206 +          417899  ,
+10.873147+       3.3497361+       2717979 +          543735  ]
 wSum_1 = weightedSum_all[args.bin]
 
 # weights for each bin & class
@@ -146,26 +142,26 @@ classWeights_noWeight = [
 [ 1.0, 1.0, 1.0, 1.0 ],
 [ 1.0, 1.0, 1.0, 1.0 ] ]
 classWeights_allEqual = [
-[ wSum_1/174.27094,       wSum_1/48.297292,       wSum_1/34819907,          wSum_1/8511550],
-[ wSum_1/84.773993,       wSum_1/17.604392,       wSum_1/15939123,          wSum_1/2770632],
-[ wSum_1/41.192327,       wSum_1/7.8943760,       wSum_1/7178234 ,          wSum_1/989307 ],
-[ wSum_1/55.650121,       wSum_1/10.229783,       wSum_1/10158870,          wSum_1/1064614],
-[ wSum_1/14.470345,       wSum_1/2.5089225,       wSum_1/2989884 ,          wSum_1/231220 ],
-[ wSum_1/11.993302,       wSum_1/2.2295808,       wSum_1/3039715 ,          wSum_1/221999 ]]
+[ wSum_1/154.01147,       wSum_1/68.556762,       wSum_1/33053664,          wSum_1/10277792],
+[ wSum_1/76.700188,       wSum_1/25.678196,       wSum_1/15163345,          wSum_1/3546410 ],
+[ wSum_1/37.205287,       wSum_1/11.881415,       wSum_1/6777390 ,          wSum_1/1390151 ],
+[ wSum_1/50.052587,       wSum_1/15.827318,       wSum_1/9471407 ,          wSum_1/1752077 ],
+[ wSum_1/13.028451,       wSum_1/3.9508159,       wSum_1/2803206 ,          wSum_1/417899  ],
+[ wSum_1/10.873147,       wSum_1/3.3497361,       wSum_1/2717979 ,          wSum_1/543735  ]]
 classWeights_doubleG = [
-[ wSum_1/174.27094*2,       wSum_1/48.297292*2,       wSum_1/34819907,          wSum_1/8511550],
-[ wSum_1/84.773993*2,       wSum_1/17.604392*2,       wSum_1/15939123,          wSum_1/2770632],
-[ wSum_1/41.192327*2,       wSum_1/7.8943760*2,       wSum_1/7178234 ,          wSum_1/989307 ],
-[ wSum_1/55.650121*2,       wSum_1/10.229783*2,       wSum_1/10158870,          wSum_1/1064614],
-[ wSum_1/14.470345*2,       wSum_1/2.5089225*2,       wSum_1/2989884 ,          wSum_1/231220 ],
-[ wSum_1/11.993302*2,       wSum_1/2.2295808*2,       wSum_1/3039715 ,          wSum_1/221999 ]]
+[ wSum_1/154.01147*2,       wSum_1/68.556762*2,       wSum_1/33053664,          wSum_1/10277792],
+[ wSum_1/76.700188*2,       wSum_1/25.678196*2,       wSum_1/15163345,          wSum_1/3546410 ],
+[ wSum_1/37.205287*2,       wSum_1/11.881415*2,       wSum_1/6777390 ,          wSum_1/1390151 ],
+[ wSum_1/50.052587*2,       wSum_1/15.827318*2,       wSum_1/9471407 ,          wSum_1/1752077 ],
+[ wSum_1/13.028451*2,       wSum_1/3.9508159*2,       wSum_1/2803206 ,          wSum_1/417899  ],
+[ wSum_1/10.873147*2,       wSum_1/3.3497361*2,       wSum_1/2717979 ,          wSum_1/543735  ]]
 classWeights_doubleH = [
-[ wSum_1/174.27094,       wSum_1/48.297292,       wSum_1/34819907*2,          wSum_1/8511550*2],
-[ wSum_1/84.773993,       wSum_1/17.604392,       wSum_1/15939123*2,          wSum_1/2770632*2],
-[ wSum_1/41.192327,       wSum_1/7.8943760,       wSum_1/7178234 *2,          wSum_1/989307 *2],
-[ wSum_1/55.650121,       wSum_1/10.229783,       wSum_1/10158870*2,          wSum_1/1064614*2],
-[ wSum_1/14.470345,       wSum_1/2.5089225,       wSum_1/2989884 *2,          wSum_1/231220 *2],
-[ wSum_1/11.993302,       wSum_1/2.2295808,       wSum_1/3039715 *2,          wSum_1/221999 *2]]
+[ wSum_1/154.01147,       wSum_1/68.556762,       wSum_1/33053664*2,          wSum_1/10277792*2],
+[ wSum_1/76.700188,       wSum_1/25.678196,       wSum_1/15163345*2,          wSum_1/3546410 *2],
+[ wSum_1/37.205287,       wSum_1/11.881415,       wSum_1/6777390 *2,          wSum_1/1390151 *2],
+[ wSum_1/50.052587,       wSum_1/15.827318,       wSum_1/9471407 *2,          wSum_1/1752077 *2],
+[ wSum_1/13.028451,       wSum_1/3.9508159,       wSum_1/2803206 *2,          wSum_1/417899  *2],
+[ wSum_1/10.873147,       wSum_1/3.3497361,       wSum_1/2717979 *2,          wSum_1/543735  *2]]
 
 if (args.weightedClasses==0):
     classWeights = tf.constant(classWeights_noWeight[args.bin])
@@ -187,6 +183,10 @@ def load_data():
     df_train = hdf_train["training"]
     df_test = hdf_test["testing"]
     
+    # extra core position cut
+    df_train = df_train[df_train.coreFiduScale<=args.coreposition]
+    df_test = df_test[df_test.coreFiduScale<=args.coreposition]
+
     # Scale up the weights for Gamma events.
     df_train_weight = df_train['TWgt']
     #print ("Training weights (DataFrame): ", df_train_weight.head())
@@ -1056,8 +1056,8 @@ print ( "Plotting Rejection GoodGamma --------" )
 fig10 = plt.figure(10, figsize=(12,8), dpi=200, facecolor='red', edgecolor='blue')
 plt.plot(DisplayStep, RejectionNoneGG_train, linestyle='-', marker='.', markersize=6, color='red', alpha=1.0, label='Training Result')
 plt.plot(DisplayStep, RejectionNoneGG_test, linestyle='-', marker='.', markersize=6, color='blue', alpha=1.0, label='Testing Result')
-plt.yscale('log')
-plt.ylim([0.9,1])
+#plt.yscale('log')
+plt.ylim([0.7,1])
 plt.xlabel('Epoch Number', fontsize=20)
 plt.ylabel('Rejection', fontsize=20)
 plt.title("Rejection (removing non-GoodGamma)", fontsize=30)
@@ -1070,8 +1070,8 @@ print ( "Plotting 1 - Rejection (GoodGamma) --" )
 fig11 = plt.figure(11, figsize=(12,8), dpi=200, facecolor='red', edgecolor='blue')
 plt.plot(DisplayStep, RejectionNoneGG_train_, linestyle='-', marker='.', markersize=6, color='red', alpha=1.0, label='Training Result')
 plt.plot(DisplayStep, RejectionNoneGG_test_, linestyle='-', marker='.', markersize=6, color='blue', alpha=1.0, label='Testing Result')
-plt.yscale('log')
-plt.ylim([0,0.1])
+#plt.yscale('log')
+plt.ylim([0,0.3])
 plt.xlabel('Epoch Number', fontsize=20)
 plt.ylabel('1 - Rejection', fontsize=20)
 plt.title("1 - Rejection (Keeping BKG)", fontsize=30)
@@ -1085,7 +1085,7 @@ fig12 = plt.figure(12, figsize=(12,8), dpi=200, facecolor='red', edgecolor='blue
 plt.plot(DisplayStep, SigRatio_train, linestyle='-', marker='.', markersize=6, color='red', alpha=1.0, label='Training Result')
 plt.plot(DisplayStep, SigRatio_test, linestyle='-', marker='.', markersize=6, color='blue', alpha=1.0, label='Testing Result')
 #plt.yscale('log')
-plt.ylim([0,10])
+#plt.ylim([0,10])
 plt.xlabel('Epoch Number', fontsize=20)
 plt.ylabel('Significance Ratio', fontsize=20)
 plt.title("recall(signal) / sqrt(1-rejection)", fontsize=30)
